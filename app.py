@@ -132,41 +132,43 @@ with st.sidebar:
     saved_kws = load_keywords()
     
     if saved_kws:
-        st.markdown("**Saved Keywords:**")
+        st.markdown("**Saved Keywords (Public View):**")
         # Display keywords as small tags using Streamlit columns and markdown styling
         tags_html = "".join([f'<span style="background-color: #2b6cb0; color: white; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.8rem; margin-right: 0.5rem; display: inline-block; margin-bottom: 0.5rem;">{kw}</span>' for kw in saved_kws])
         st.markdown(tags_html, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        if st.button("🗑️ Clear All Keywords", use_container_width=True):
-            clear_keywords()
-            st.rerun()
             
-    st.markdown("---")
-    new_keyword = st.text_input("Add New Keyword(s)", placeholder="e.g. 삼성전자, 현대차", help="Comma-separated keywords to add to your saved list.")
-    
-    if st.button("➕ Add Keywords", use_container_width=True):
-        if new_keyword:
-            add_keywords(new_keyword)
-            st.success("Keywords added!")
-            import time
-            time.sleep(0.5)
-            st.rerun()
-        else:
-            st.warning("Please enter a keyword to add.")
-        
-    max_articles = st.slider("Max articles per keyword", min_value=1, max_value=20, value=5, help="Depending on the language, total fetched articles might be multiplied by the number of keywords.")
-    
     st.markdown("---")
     
     with st.expander("🔐 Admin Controls (Password Required)"):
-        st.markdown("Enter password to fetch new articles or clear the database.")
+        st.markdown("Enter password to manage keywords and fetch news.")
         admin_password = st.text_input("Admin Password", type="password")
         
         # We can use a simple hardcoded password or get from .env
         CORRECT_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin1234")
         
         if admin_password == CORRECT_PASSWORD:
+            st.markdown("#### 1. Keyword Management")
+            new_keyword = st.text_input("Add New Keyword(s)", placeholder="e.g. 삼성전자, 현대차", help="Comma-separated keywords to add to your saved list.")
+            if st.button("➕ Add Keywords", use_container_width=True):
+                if new_keyword:
+                    add_keywords(new_keyword)
+                    st.success("Keywords added!")
+                    import time
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.warning("Please enter a keyword to add.")
+            
+            if saved_kws:
+                if st.button("🗑️ Clear All Keywords", use_container_width=True):
+                    clear_keywords()
+                    st.rerun()
+            
+            st.markdown("#### 2. Fetch Settings")
+            max_articles = st.slider("Max articles per keyword", min_value=1, max_value=20, value=5)
+            
+            st.markdown("#### 3. Actions")
             if st.button("🚀 기사 수집 및 번역 실행", type="primary", use_container_width=True):
                 st.session_state.run_fetch = True
                 
