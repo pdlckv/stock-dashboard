@@ -254,11 +254,32 @@ for i, tab in enumerate(tabs):
         if not saved_articles:
             st.info("No saved articles yet. Add keywords and click **'🚀 기사 수집 및 번역 실행'** on the left menu.")
         else:
-            st.caption(f"Showing {len(saved_articles)} saved articles.")
+            # Filter by Keyword
+            filter_options = ["전체 보기 (Show All)"] + saved_kws
+            selected_filter = st.selectbox(f"🔍 키워드로 필터링 ({current_language})", filter_options, key=f"filter_{current_language}")
+            
+            filtered_articles = []
+            if selected_filter != "전체 보기 (Show All)":
+                for row in saved_articles:
+                    search_text = f"{row.get('title','')} {row.get('kr_title','')} {row.get('kr_summary','')}".lower()
+                    if selected_filter.lower() in search_text:
+                        filtered_articles.append(row)
+            else:
+                filtered_articles = saved_articles
+                
+            st.caption(f"Showing {len(filtered_articles)} saved articles.")
+            
+            if not filtered_articles:
+                st.warning(f"'{selected_filter}' 키워드가 포함된 기사를 찾을 수 없습니다.")
+            
             # Display each article as a card
-            for row in saved_articles:
+            for row in filtered_articles:
                 # Handle old articles that might not have kr_source
                 display_source = row.get('kr_source') or row.get('source')
+                
+                # Escape quotes for JS
+                js_title = str(row['kr_title']).replace("'", "\\'").replace('"', '\\"')
+                js_link = str(row['link']).replace("'", "\\'").replace('"', '\\"')
                 
                 html_card = f"""
                 <div class="news-card">
@@ -271,9 +292,14 @@ for i, tab in enumerate(tabs):
                     <div style="font-size: 0.95rem; color: #e2e8f0; margin-bottom: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px; border-left: 4px solid #fca311;">
                         💡 <strong>AI 요약:</strong> {row['kr_summary']}
                     </div>
-                    <div class="news-meta">
-                        <span class="source-badge">{display_source}</span>
-                        <span>{row['published']}</span>
+                    <div class="news-meta" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span class="source-badge">{display_source}</span>
+                            <span>{row['published']}</span>
+                        </div>
+                        <button onclick="if(navigator.share) {{ navigator.share({{title: '{js_title}', url: '{js_link}'}}) }} else {{ navigator.clipboard.writeText('{js_link}'); alert('링크가 복사되었습니다!'); }}" style="background: #2b6cb0; border: none; color: white; cursor: pointer; padding: 0.3rem 0.8rem; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">
+                            🔗 기사 공유
+                        </button>
                     </div>
                 </div>
                 """
