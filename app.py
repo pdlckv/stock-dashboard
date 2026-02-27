@@ -95,7 +95,7 @@ st.markdown("""
 
 # Application Header
 st.title("🌐 Global Perspective: Korea Stock Market")
-st.markdown('<p class="subtitle">Gain insights from reputable international media across 5 different languages.</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Gain insights from reputable international media across 7 different languages.</p>', unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KEYWORDS_FILE = os.path.join(BASE_DIR, "saved_keywords.txt")
