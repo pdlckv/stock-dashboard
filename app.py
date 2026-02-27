@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from news_fetcher import get_news_for_language, NEWS_CONFIG
 from ai_translator import translate_and_summarize, translate_keyword
+from news_storage import add_article, get_news_by_language, clear_all_news
 from datetime import datetime
 import pandas as pd
 
@@ -160,6 +161,13 @@ with st.sidebar:
     if st.button("🚀 기사 수집 및 번역 실행", type="primary", use_container_width=True):
         st.session_state.run_fetch = True
         
+    if st.button("🗑️ 보관된 기사 전체 삭제", use_container_width=True):
+        clear_all_news()
+        st.success("All saved news cleared!")
+        import time
+        time.sleep(0.5)
+        st.rerun()
+        
     st.markdown("---")
     st.markdown("### Supported Languages")
     for lang in NEWS_CONFIG.keys():
@@ -178,11 +186,9 @@ for i, tab in enumerate(tabs):
         current_language = language_names[i]
         st.subheader(f"Latest News in {current_language}")
         
-        if not st.session_state.run_fetch:
-            st.info("👈 좌측 사이드바의 **'🚀 기사 수집 및 번역 실행'** 버튼을 클릭하여 최신 기사를 불러오세요.")
-        else:
-            # Add a spinner while fetching data
-            with st.spinner(f"Fetching {current_language} news..."):
+        # 1. Fetch and save if button clicked
+        if st.session_state.run_fetch:
+            with st.spinner(f"Fetching and saving new {current_language} articles..."):
                 try:
                     search_keywords = None
                     if saved_kws:
@@ -198,44 +204,65 @@ for i, tab in enumerate(tabs):
                         
                     df = get_news_for_language(current_language, max_items=max_articles, search_keywords=search_keywords)
                     
-                    if df.empty:
-                        st.info(f"No recent news found for the specific keywords in {current_language}.")
-                    else:
-                        # Sort by published date if possible (basic sorting, RSS dates can be tricky formats)
-                        # For a robust app, we'd parse datetime carefully. For now, present as fetched.
-                        num_articles = len(df)
-                        st.caption(f"Found {num_articles} relevant articles globally.")
+                    if not df.empty:
+                        existing_news = get_news_by_language(current_language)
+                        existing_links = {n['link'] for n in existing_news}
                         
-                        # Display each article as a card
+                        new_count = 0
                         for index, row in df.iterrows():
-                            # Basic parsing of pub date to look cleaner if possible, else just show string
-                            pub_date = row['published']
-                            
-                            ai_result = translate_and_summarize(row['title'], current_language)
-                            kr_title = ai_result.get('translated_title', row['title'])
-                            kr_summary = ai_result.get('summary', '')
-                            
-                            html_card = f"""
-                            <div class="news-card">
-                                <div class="news-title">
-                                    <a href="{row['link']}" target="_blank">{kr_title}</a>
-                                </div>
-                                <div style="font-size: 0.95rem; color: #cbd5e0; margin-bottom: 0.5rem; font-style: italic;">
-                                    원문: {row['title']}
-                                </div>
-                                <div style="font-size: 0.95rem; color: #e2e8f0; margin-bottom: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px; border-left: 4px solid #fca311;">
-                                    💡 <strong>AI 요약:</strong> {kr_summary}
-                                </div>
-                                <div class="news-meta">
-                                    <span class="source-badge">{row['source']}</span>
-                                    <span>{pub_date}</span>
-                                </div>
-                            </div>
-                            """
-                            st.markdown(html_card, unsafe_allow_html=True)
+                            # Translate and save only if not already saved
+                            if row['link'] not in existing_links:
+                                ai_result = translate_and_summarize(row['title'], current_language)
+                                
+                                article_data = {
+                                    'title': row['title'],
+                                    'link': row['link'],
+                                    'published': row['published'],
+                                    'source': row['source'],
+                                    'kr_title': ai_result.get('translated_title', row['title']),
+                                    'kr_summary': ai_result.get('summary', ''),
+                                    'language': current_language
+                                }
+                                
+                                if add_article(article_data):
+                                    new_count += 1
+                        
+                        if new_count > 0:
+                            st.success(f"Added {new_count} new translated articles!")
                             
                 except Exception as e:
                     st.error(f"Error fetching data: {str(e)}")
+
+        # 2. Display saved articles
+        saved_articles = get_news_by_language(current_language)
+        if not saved_articles:
+            st.info("No saved articles yet. Add keywords and click **'🚀 기사 수집 및 번역 실행'** on the left menu.")
+        else:
+            st.caption(f"Showing {len(saved_articles)} saved articles.")
+            # Display each article as a card
+            for row in saved_articles:
+                html_card = f"""
+                <div class="news-card">
+                    <div class="news-title">
+                        <a href="{row['link']}" target="_blank">{row['kr_title']}</a>
+                    </div>
+                    <div style="font-size: 0.95rem; color: #cbd5e0; margin-bottom: 0.5rem; font-style: italic;">
+                        원문: {row['title']}
+                    </div>
+                    <div style="font-size: 0.95rem; color: #e2e8f0; margin-bottom: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px; border-left: 4px solid #fca311;">
+                        💡 <strong>AI 요약:</strong> {row['kr_summary']}
+                    </div>
+                    <div class="news-meta">
+                        <span class="source-badge">{row['source']}</span>
+                        <span>{row['published']}</span>
+                    </div>
+                </div>
+                """
+                st.markdown(html_card, unsafe_allow_html=True)
+                
+# Reset fetch state after rendering all tabs so it doesn't loop
+if st.session_state.run_fetch:
+    st.session_state.run_fetch = False
 
 st.markdown("---")
 st.caption("Data sourced from Google News RSS. This is a prototype dashboard.")

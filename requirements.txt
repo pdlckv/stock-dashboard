@@ -3,3 +3,4 @@ feedparser
 pandas
 langchain-google-genai
 python-dotenv
+supabase
