@@ -219,12 +219,14 @@ for i, tab in enumerate(tabs):
                     
                     if not df.empty:
                         existing_news = get_news_by_language(current_language)
-                        existing_links = {n['link'] for n in existing_news}
+                        # Google News changes URL parameters often, so it's safer to check for uniqueness
+                        # by comparing the exact original titles.
+                        existing_titles = {n.get('title', '') for n in existing_news}
                         
                         new_count = 0
                         for index, row in df.iterrows():
                             # Translate and save only if not already saved
-                            if row['link'] not in existing_links:
+                            if row['title'] not in existing_titles:
                                 ai_result = translate_and_summarize(row['title'], row['source'], current_language)
                                 
                                 article_data = {
