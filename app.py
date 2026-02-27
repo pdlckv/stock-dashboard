@@ -158,16 +158,27 @@ with st.sidebar:
     max_articles = st.slider("Max articles per keyword", min_value=1, max_value=20, value=5, help="Depending on the language, total fetched articles might be multiplied by the number of keywords.")
     
     st.markdown("---")
-    if st.button("🚀 기사 수집 및 번역 실행", type="primary", use_container_width=True):
-        st.session_state.run_fetch = True
+    
+    with st.expander("🔐 Admin Controls (Password Required)"):
+        st.markdown("Enter password to fetch new articles or clear the database.")
+        admin_password = st.text_input("Admin Password", type="password")
         
-    if st.button("🗑️ 보관된 기사 전체 삭제", use_container_width=True):
-        clear_all_news()
-        st.success("All saved news cleared!")
-        import time
-        time.sleep(0.5)
-        st.rerun()
+        # We can use a simple hardcoded password or get from .env
+        CORRECT_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin1234")
         
+        if admin_password == CORRECT_PASSWORD:
+            if st.button("🚀 기사 수집 및 번역 실행", type="primary", use_container_width=True):
+                st.session_state.run_fetch = True
+                
+            if st.button("🗑️ 보관된 기사 전체 삭제", use_container_width=True):
+                clear_all_news()
+                st.success("All saved news cleared!")
+                import time
+                time.sleep(0.5)
+                st.rerun()
+        else:
+            st.warning("Please enter the correct password to unlock actions.")
+            
     st.markdown("---")
     st.markdown("### Supported Languages")
     for lang in NEWS_CONFIG.keys():
