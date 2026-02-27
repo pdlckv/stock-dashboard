@@ -18,13 +18,13 @@ except Exception as e:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def translate_and_summarize(title: str, language: str) -> dict:
+def translate_and_summarize(title: str, source: str, language: str) -> dict:
     """
     Translates a news title to Korean and provides a 1-2 sentence summary context.
     Since we only have the title and RSS snippet, the summary will be brief.
     """
     if not llm:
-        return {"translated_title": f"[번역 불가] {title}", "summary": "API 키를 설정해주세요 (.env 파일에 GEMINI_API_KEY 입력)"}
+        return {"translated_title": f"[번역 불가] {title}", "summary": "API 키를 설정해주세요 (.env 파일에 GEMINI_API_KEY 입력)", "kr_source": source}
         
     if language == "English":
         source_lang = "English"
@@ -44,14 +44,17 @@ def translate_and_summarize(title: str, language: str) -> dict:
         
     Source Language: {source_lang}
     Original Title: {title}
+    Original Source Media Outlet: {source}
     
     Task 1: Translate the exact title accurately into natural Korean suitable for a professional economic news dashboard. Keep it concise as a headline.
     Task 2: Based solely on the title, write a 1-2 sentence brief summary in Korean explaining the likely core context or market implication of this news.
+    Task 3: Translate the name of the 'Original Source Media Outlet' into Korean. If it's a globally known entity (like Bloomberg, Reuters, CNBC, Nihon Keizai Shimbun), translate or transliterate it naturally into Korean (e.g. 블룸버그, 로이터, CNBC, 니혼게이자이 신문). Add the country name if helpful (e.g. 미국 CNBC).
     
     Output strictly in the following JSON format:
     {{
         "translated_title": "번역된 제목",
-        "summary": "간략한 요약..."
+        "summary": "간략한 요약...",
+        "kr_source": "한국어로 번역된 언론사 이름"
     }}
     """
     
@@ -69,11 +72,11 @@ def translate_and_summarize(title: str, language: str) -> dict:
             return json.loads(clean_content)
         except json.JSONDecodeError as je:
              print(f"JSON Parsing Error: {je} from {clean_content}")
-             return {"translated_title": title, "summary": "요약 파싱 실패"}
+             return {"translated_title": title, "summary": "요약 파싱 실패", "kr_source": source}
             
     except Exception as e:
         print(f"Error during AI translation: {e}")
-        return {"translated_title": title, "summary": "번역/요약 중 오류 발생"}
+        return {"translated_title": title, "summary": "번역/요약 중 오류 발생", "kr_source": source}
 
 @st.cache_data(ttl=3600*24, show_spinner=False)
 def translate_keyword(keyword: str, target_language: str) -> str:

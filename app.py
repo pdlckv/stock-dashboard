@@ -212,7 +212,7 @@ for i, tab in enumerate(tabs):
                         for index, row in df.iterrows():
                             # Translate and save only if not already saved
                             if row['link'] not in existing_links:
-                                ai_result = translate_and_summarize(row['title'], current_language)
+                                ai_result = translate_and_summarize(row['title'], row['source'], current_language)
                                 
                                 article_data = {
                                     'title': row['title'],
@@ -221,6 +221,7 @@ for i, tab in enumerate(tabs):
                                     'source': row['source'],
                                     'kr_title': ai_result.get('translated_title', row['title']),
                                     'kr_summary': ai_result.get('summary', ''),
+                                    'kr_source': ai_result.get('kr_source', row['source']),
                                     'language': current_language
                                 }
                                 
@@ -241,6 +242,9 @@ for i, tab in enumerate(tabs):
             st.caption(f"Showing {len(saved_articles)} saved articles.")
             # Display each article as a card
             for row in saved_articles:
+                # Handle old articles that might not have kr_source
+                display_source = row.get('kr_source') or row.get('source')
+                
                 html_card = f"""
                 <div class="news-card">
                     <div class="news-title">
@@ -253,7 +257,7 @@ for i, tab in enumerate(tabs):
                         💡 <strong>AI 요약:</strong> {row['kr_summary']}
                     </div>
                     <div class="news-meta">
-                        <span class="source-badge">{row['source']}</span>
+                        <span class="source-badge">{display_source}</span>
                         <span>{row['published']}</span>
                     </div>
                 </div>
