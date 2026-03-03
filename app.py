@@ -188,10 +188,17 @@ with st.sidebar:
 
 # Create tabs for each language
 language_names = list(NEWS_CONFIG.keys())
-tabs = st.tabs(language_names)
 
+# --- Progress Bar Container ---
+progress_container = st.empty()
 if "run_fetch" not in st.session_state:
     st.session_state.run_fetch = False
+
+if st.session_state.run_fetch:
+    progress_bar = progress_container.progress(0, text="준비 중...")
+    total_languages = len(language_names)
+
+tabs = st.tabs(language_names)
 
 # Render content for each tab
 for i, tab in enumerate(tabs):
@@ -201,6 +208,11 @@ for i, tab in enumerate(tabs):
         
         # 1. Fetch and save if button clicked
         if st.session_state.run_fetch:
+            # Update overall language progress
+            current_lang_idx = i
+            base_progress = current_lang_idx / total_languages
+            progress_bar.progress(base_progress, text=f"[{i+1}/{total_languages}] {current_language} 기사 수집 준비 중...")
+            
             with st.spinner(f"Fetching and saving new {current_language} articles..."):
                 try:
                     search_keywords = None
@@ -215,6 +227,7 @@ for i, tab in enumerate(tabs):
                         display_queries = ", ".join(translated_keywords)
                         st.caption(f"Search queries: **{display_queries}**")
                         
+                    progress_bar.progress(base_progress, text=f"[{i+1}/{total_languages}] {current_language} RSS 피드 가져오는 중...")
                     df = get_news_for_language(current_language, max_items=max_articles, search_keywords=search_keywords)
                     
                     if not df.empty:
@@ -224,7 +237,14 @@ for i, tab in enumerate(tabs):
                         existing_titles = {n.get('title', '') for n in existing_news}
                         
                         new_count = 0
+                        total_articles = len(df)
+                        
                         for index, row in df.iterrows():
+                            # Update detailed progress for each article
+                            article_progress_step = (1 / total_languages) * ((index + 1) / total_articles)
+                            current_progress = base_progress + article_progress_step
+                            progress_bar.progress(min(current_progress, 1.0), text=f"[{i+1}/{total_languages}] {current_language} 기사 번역 중... ({index+1}/{total_articles})")
+                            
                             # Translate and save only if not already saved
                             if row['title'] not in existing_titles:
                                 ai_result = translate_and_summarize(row['title'], row['source'], current_language)
@@ -248,6 +268,15 @@ for i, tab in enumerate(tabs):
                             
                 except Exception as e:
                     st.error(f"Error fetching data: {str(e)}")
+                    
+            # If we are on the very last language tab, clear the progress bar and reset state
+            if i == total_languages - 1:
+                progress_bar.progress(1.0, text="모든 수집 완료!")
+                import time
+                time.sleep(1)
+                progress_container.empty()
+                st.session_state.run_fetch = False
+                st.rerun()
 
         # 2. Display saved articles
         saved_articles = get_news_by_language(current_language)
