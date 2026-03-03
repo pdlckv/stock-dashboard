@@ -24,7 +24,51 @@ def format_date_kst(date_str: str) -> str:
     except Exception:
         return date_str
 
-def fetch_news(keyword: str, language_code: str, country_code: str, max_items: int = 10) -> pd.DataFrame:
+# Global Blacklist: strict paywalls or unreliable sources
+GLOBAL_BLACKLIST = [
+    "Bloomberg", "The Wall Street Journal", "Financial Times", 
+    "The New York Times", "The Economist", "Nikkei Asian Review",
+    "Seeking Alpha", "FactSet", "Morningstar"
+]
+
+# Language-specific Whitelist: high-quality, reputable, mostly free access
+SOURCE_WHITELIST = {
+    "English": ["Reuters", "CNBC", "Yahoo Finance", "BBC News", "Associated Press", "CNN", "MarketWatch", "Investing.com", "Fox Business", "NPR"],
+    "Japanese (日本語)": ["Yahoo!ニュース", "NHK NEWS WEB", "ロイター (Reuters Japan)", "東洋経済オンライン", "ダイヤモンド・オンライン", "マネーポストWEB", "ブルームバーグ (Bloomberg Japan)", "CNN.co.jp", "Newsweekjapan"],
+    "Chinese (中文)": ["新浪财经", "路透 (Reuters China)", "联合早报", "凤凰网", "搜狐财经", "腾讯网", "FX168"],
+    "Spanish (Español)": ["Reuters", "Investing.com España", "Cinco Días", "Expansión", "El Economista", "BBC News Mundo", "CNN en Español"],
+    "Arabic (العربية)": ["العربية (Al Arabiya)", "CNBC Arabia", "رويترز (Reuters Arabic)", "سكاي نيوز عربية", "الجزيرة (Al Jazeera)", "الاقتصادية"],
+    "German (Deutsch)": ["Reuters", "tagesschau.de", "DER SPIEGEL", "WirtschaftsWoche", "Handelsblatt", "finanzen.net", "ZDFheute"],
+    "French (Français)": ["Reuters", "Les Echos", "Le Figaro", "BFM Business", "La Tribune", "Capital.fr", "Le Monde"]
+}
+
+def is_allowed_source(source_name: str, language_name: str) -> bool:
+    """
+    Checks if a news source is allowed based on the blacklist and language whitelist.
+    """
+    if not source_name:
+        return False
+        
+    source_lower = source_name.lower()
+    
+    # 1. Check Global Blacklist
+    for blacklisted in GLOBAL_BLACKLIST:
+        if blacklisted.lower() in source_lower:
+            return False
+            
+    # 2. Check Language Whitelist
+    whitelist = SOURCE_WHITELIST.get(language_name, [])
+    if whitelist:
+        for whitelisted in whitelist:
+             if whitelisted.lower() in source_lower:
+                 return True
+        # If a whitelist exists for this language, and it's not in it, we block it to ensure high quality
+        return False
+    
+    # If no whitelist is defined for this language, allow it (fallback)
+    return True
+
+def fetch_news(keyword: str, language_code: str, country_code: str, language_name: str, max_items: int = 10) -> pd.DataFrame:
     """
     Fetches news from Google News RSS and returns a Pandas DataFrame.
     """
@@ -32,16 +76,25 @@ def fetch_news(keyword: str, language_code: str, country_code: str, max_items: i
     feed = feedparser.parse(url)
     
     articles = []
-    for entry in feed.entries[:max_items]:
+    # We fetch more because we will filter out some
+    for entry in feed.entries[:max_items * 3]:
+        source_name = entry.source.title if hasattr(entry, 'source') else 'Unknown'
+        
+        if not is_allowed_source(source_name, language_name):
+            continue
+            
         pub_date = entry.published if hasattr(entry, 'published') else ''
         pub_date_kst = format_date_kst(pub_date)
         articles.append({
             'title': entry.title,
             'link': entry.link,
             'published': pub_date_kst,
-            'source': entry.source.title if hasattr(entry, 'source') else 'Unknown'
+            'source': source_name
         })
         
+        if len(articles) >= max_items:
+            break
+            
     return pd.DataFrame(articles)
 
 # Configuration mapping for our 5 languages
@@ -98,7 +151,7 @@ def get_news_for_language(language_name: str, max_items: int = 10, search_keywor
     keywords_to_search = search_keywords if search_keywords else config['keywords']
     
     for keyword in keywords_to_search:
-        df = fetch_news(keyword, config['language_code'], config['country_code'], max_items=max_items)
+        df = fetch_news(keyword, config['language_code'], config['country_code'], language_name, max_items=max_items)
         all_articles_df = pd.concat([all_articles_df, df], ignore_index=True)
         
     # Drop duplicates based on the link
